@@ -42,7 +42,7 @@ impl RccExt for RCC {
 /// Constrained RCC peripheral
 pub struct Rcc {
     pub clocks: Clocks,
-    pub(crate) regs: RCC,
+    pub regs: RCC,
 }
 
 pub enum HSEBypassMode {
