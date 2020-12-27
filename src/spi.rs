@@ -530,3 +530,36 @@ where
         Ok(())
     }
 }
+
+// Constructs 32-bit frames as two immediately-sequential 16-bit frames
+impl<SPI, SCKPIN, MISOPIN, MOSIPIN> ::embedded_hal::blocking::spi::Transfer<u32>
+    for Spi<SPI, SCKPIN, MISOPIN, MOSIPIN, SixteenBit>
+where
+    SPI: Deref<Target = SpiRegisterBlock>,
+{
+    type Error = Error;
+
+    fn transfer<'w>(&mut self, words: &'w mut [u32]) -> Result<&'w [u32], Self::Error> {
+        // We want to transfer bidirectionally, make sure we're in the correct mode
+        self.set_bidi();
+
+        for word in words.iter_mut() {
+            let upper_halfword_out = (*word >> 16) as u16;
+            let lower_halfword_out = *word as u16;
+
+            nb::block!(self.check_send())?;
+            self.send_u16(upper_halfword_out);
+            nb::block!(self.check_send())?;
+            self.send_u16(lower_halfword_out);
+
+            nb::block!(self.check_read())?;
+            let upper_halfword_in = self.read_u16();
+            nb::block!(self.check_read())?;
+            let lower_halfword_in = self.read_u16();
+
+            *word = ((upper_halfword_in as u32) << 16) | (lower_halfword_in as u32);
+        }
+
+        Ok(words)
+    }
+}
