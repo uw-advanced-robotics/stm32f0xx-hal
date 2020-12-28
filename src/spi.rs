@@ -563,3 +563,30 @@ where
         Ok(words)
     }
 }
+
+impl<SPI, SCKPIN, MISOPIN, MOSIPIN> ::embedded_hal::blocking::spi::Write<u32>
+    for Spi<SPI, SCKPIN, MISOPIN, MOSIPIN, SixteenBit>
+where
+    SPI: Deref<Target = SpiRegisterBlock>,
+{
+    type Error = Error;
+
+    fn write(&mut self, words: &[u32]) -> Result<(), Self::Error> {
+        // We only want to send, so we don't need to worry about the receive buffer overflowing
+        self.set_send_only();
+
+        for word in words {
+            let upper_halfword_out = (*word >> 16) as u16;
+            let lower_halfword_out = *word as u16;
+
+            nb::block!(self.check_send())?;
+            self.send_u16(upper_halfword_out);
+            nb::block!(self.check_send())?;
+            self.send_u16(lower_halfword_out);
+        }
+
+        // Do one last status register check before continuing
+        self.check_send().ok();
+        Ok(())
+    }
+}
