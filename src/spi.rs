@@ -391,7 +391,7 @@ where
         }
     }
 
-    fn check_send(&mut self) -> nb::Result<(), Error> {
+    fn check_can_send(&mut self) -> nb::Result<(), Error> {
         let sr = self.spi.sr.read();
 
         Err(if sr.ovr().bit_is_set() {
@@ -405,6 +405,20 @@ where
         } else {
             nb::Error::WouldBlock
         })
+    }
+
+    fn check_has_sent(&mut self) -> nb::Result<(), Error> {
+        self.check_can_send()?;
+
+        // Note: this reads from the register a second time. Probably fine, but
+        // not optimal.
+        let sr = self.spi.sr.read();
+
+        if sr.bsy().bit_is_clear() {
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
     }
 
     fn read_u8(&mut self) -> u8 {
@@ -444,7 +458,7 @@ where
         self.set_bidi();
 
         for word in words.iter_mut() {
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u8(word.clone());
             nb::block!(self.check_read())?;
             *word = self.read_u8();
@@ -468,7 +482,7 @@ where
         self.set_send_only();
 
         // Make sure we don't continue with an error condition
-        nb::block!(self.check_send())?;
+        nb::block!(self.check_can_send())?;
 
         // We have a 32 bit buffer to work with, so let's fill it before checking the status
         for word in words {
@@ -482,7 +496,7 @@ where
         }
 
         // Do one last status register check before continuing
-        self.check_send().ok();
+        let _ = nb::block!(self.check_has_sent());
         Ok(())
     }
 }
@@ -499,7 +513,7 @@ where
         self.set_bidi();
 
         for word in words.iter_mut() {
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(*word);
             nb::block!(self.check_read())?;
             *word = self.read_u16();
@@ -521,12 +535,12 @@ where
         self.set_send_only();
 
         for word in words {
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(word.clone());
         }
 
         // Do one last status register check before continuing
-        self.check_send().ok();
+        let _ = nb::block!(self.check_has_sent());
         Ok(())
     }
 }
@@ -547,9 +561,9 @@ where
             let upper_halfword_out = (*word >> 16) as u16;
             let lower_halfword_out = *word as u16;
 
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(upper_halfword_out);
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(lower_halfword_out);
 
             nb::block!(self.check_read())?;
@@ -579,14 +593,14 @@ where
             let upper_halfword_out = (*word >> 16) as u16;
             let lower_halfword_out = *word as u16;
 
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(upper_halfword_out);
-            nb::block!(self.check_send())?;
+            nb::block!(self.check_can_send())?;
             self.send_u16(lower_halfword_out);
         }
 
         // Do one last status register check before continuing
-        self.check_send().ok();
+        let _ = nb::block!(self.check_has_sent());
         Ok(())
     }
 }
