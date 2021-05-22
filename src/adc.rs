@@ -42,6 +42,7 @@ const VTEMPCAL30: *const u16 = 0x1FFF_F7B8 as *const u16;
 const VTEMPCAL110: *const u16 = 0x1FFF_F7C2 as *const u16;
 const VDD_CALIB: u16 = 3300;
 
+use core::convert::Infallible;
 use core::ptr;
 
 use embedded_hal::{
@@ -610,7 +611,7 @@ where
     WORD: From<u16>,
     PIN: Channel<Adc, ID = u8>,
 {
-    type Error = ();
+    type Error = Infallible;
 
     fn read(&mut self, _pin: &mut PIN) -> nb::Result<WORD, Self::Error> {
         self.power_up();
